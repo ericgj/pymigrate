@@ -1,18 +1,20 @@
-from task import Task
 from subprocess import Popen, CalledProcessError, PIPE
 from tempfile import TemporaryFile
 
+from pymonad.Maybe import Nothing, Just
+from task import Task
 
-# TODO: maybe-ify out and err data
-# List String -> File -> Task Error (String, String)
+# List String -> File -> Task Error (Maybe String, Maybe String)
 def subprocess(args,stdin=PIPE):
   def _subproc(rej,res):
     try:
       p = Popen(args, stdin=stdin, stdout=PIPE, stderr=PIPE, close_fds=True)
       (outdata, errdata) = p.communicate()
       ret = p.returncode
+      mout = Nothing if len(outdata)==0 else Just(outdata)
+      merr = Nothing if len(errdata)==0 else Just(errdata)
       if ret == 0:
-        res((outdata,errdata))
+        res((mout,merr))
       else:
         e = CalledProcessError(returncode=ret, cmd=" ".join(args), output=outdata)
         rej(e)
@@ -24,7 +26,7 @@ def subprocess(args,stdin=PIPE):
 
 
 # String -> Task IOError File
-def readfile(fname):
+def openfile(fname):
   def _read(rej,res):
     try:
       res( open(fname) )
