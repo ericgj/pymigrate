@@ -1,5 +1,6 @@
 from subprocess import Popen, CalledProcessError, PIPE
 from tempfile import TemporaryFile
+import os
 
 from pymonad.Maybe import Nothing, Just
 from task import Task
@@ -52,4 +53,14 @@ def tempfile(str):
 
   return Task(_read)
 
+
+def listdir(path):
+  def _list(rej,res):
+    try:
+      res( os.listdir(path) )
+    
+    except OSError as e:
+      rej(e)
+
+  return Task(_list)
 
