@@ -1,9 +1,11 @@
 from subprocess import Popen, CalledProcessError, PIPE
 from tempfile import TemporaryFile
+from logging import DEBUG, INFO, WARN, ERROR
 import os
 
 from pymonad.Maybe import Nothing, Just
 from task import Task
+import log
 
 # List String -> File -> Task Error (Maybe String, Maybe String)
 def subprocess(args,stdin=PIPE):
@@ -63,4 +65,41 @@ def listdir(path):
       rej(e)
 
   return Task(_list)
+
+
+def logtask(msg,addr,task):
+  def _start(rej,res):
+    try:
+      log.start(msg,addr)
+      res(None)
+    except Exception as e:
+      rej(e) 
+
+  def _end(rej,res):
+    try:
+      log.end(msg,addr)
+      res(None)
+    except Exception as e:
+      rej(e)
+
+  return (Task(_start) >> task) >> Task(_end)
+
+
+def logresult(fn,addr,lvl,task):
+  def _log(lvl):
+    def _tap(x):
+      try:
+        log.log(lvl,fn(x),addr)
+        return x
+      except Exception:
+        return x
+    return _tap
+
+  return task.bimap( _log(ERROR), _log(lvl) )
+
+def logresult_debug(fn,addr,task):
+  return logresult(fn,addr,DEBUG,task)
+
+def logresult_info(fn,addr,task):
+  return logresult(fn,addr,INFO,task)
 

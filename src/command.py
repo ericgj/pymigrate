@@ -7,7 +7,7 @@ from pymonad.Reader import curry
 from pymonad.Maybe import Nothing, Just
 
 import Task
-from tasks import subprocess, tempfile, listdir
+from tasks import subprocess, tempfile, listdir, logtask, logresult_info, logresult_debug
 
 PATTERN_SCHEMA_FILE = re.compile('^(\d{14})\-do\-([\w-]*)\.sql$')
 PATTERN_SCHEMA_UNDO_FILE = re.compile('^(\d{14})\-undo\-*([\w-]*)\.sql$')
@@ -24,7 +24,7 @@ class NoValueFoundError(Exception):
     return "NoValueFoundError: No such field '%s' in returned data" % self.field
 
 
-def init(dbcmd, table="_version_" ):
+def init(logger, dbcmd, table="_version_" ):
   
   sql = (
     """
@@ -37,23 +37,35 @@ def init(dbcmd, table="_version_" ):
     """
   ) % (table)
 
-  return tempfile(sql) >> db_task(dbcmd)
+  return logtask("Preparing database, if needed", logger, 
+                 tempfile(sql) >> db_task(dbcmd)
+         )
 
 
-def check(dbcmd, schema_dir, table="_version_" ):
+def check(logger, dbcmd, schema_dir, table="_version_" ):
   matcher = flip(applyf)(matching_schema_files_newer_than)
-  return Task.all([
-           db_current_version(dbcmd,table),
-           schema_current_files(schema_dir)
+  task = Task.all([
+           db_current_version(logger,dbcmd,table),
+           schema_current_files(logger,schema_dir)
          ]).fmap( matcher )
+  msg = lambda files: "no new local schema migrations found" if len(files) == 0 else (
+                      "new local schema migrations found: %s" % ", ".join(files) )
+  
+  return logtask("Checking for new migration files", logger, 
+           logresult_info(msg, logger, task)
+         )
 
 
-def schema_current_files(schema_dir):
-  return listdir(schema_dir).fmap(matching_schema_files)
+def schema_current_files(logger, schema_dir):
+  task = listdir(schema_dir).fmap(matching_schema_files)
+  msg = lambda files: (
+          "total local schema migrations: %d (latest: %s)" % ( len(files), files[-1] )
+        )
+  return logresult_info(msg,logger,task)
 
 
 # String -> String -> Task Error String
-def db_current_version(dbcmd, table="_version_" ):
+def db_current_version(logger, dbcmd, table="_version_" ):
   
   sql = (
     """
@@ -61,9 +73,11 @@ def db_current_version(dbcmd, table="_version_" ):
     """
   ) % (table, table)
 
-  return (tempfile(sql) >> db_getvalue(dbcmd,'version')) >> (
+  task = (tempfile(sql) >> db_getvalue(dbcmd,'version')) >> (
            reject_unless(NoValueFoundError('version'))
          )
+  msg = lambda v: "database version: %s" % v
+  return logresult_info(msg, logger, task)
 
 
 # String -> File -> Task Error (Maybe String)
