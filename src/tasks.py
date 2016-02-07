@@ -19,7 +19,7 @@ def subprocess(args,stdin=PIPE):
       if ret == 0:
         res((mout,merr))
       else:
-        e = CalledProcessError(returncode=ret, cmd=" ".join(args), output=outdata)
+        e = CalledProcessError(returncode=ret, cmd=" ".join(args), output=(outdata + errdata))
         rej(e)
       
     except (EnvironmentError, ValueError) as e:
@@ -59,7 +59,7 @@ def tempfile(str):
 def listdir(path):
   def _list(rej,res):
     try:
-      res( os.listdir(path) )
+      res( [os.path.join(path,f) for f in os.listdir(path)] )
     
     except OSError as e:
       rej(e)
@@ -75,14 +75,16 @@ def logtask(msg,addr,task):
     except Exception as e:
       rej(e) 
 
-  def _end(rej,res):
-    try:
-      log.end(msg,addr)
-      res(None)
-    except Exception as e:
-      rej(e)
+  def _end(x):
+    def _tap(rej,res):
+      try:
+        log.end(msg,addr)
+        res(x)
+      except Exception as e:
+        rej(e)
+    return Task(_tap)
 
-  return (Task(_start) >> task) >> Task(_end)
+  return (Task(_start) >> (lambda _: task)) >> _end
 
 
 def logresult(fn,addr,lvl,task):
