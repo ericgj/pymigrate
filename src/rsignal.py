@@ -3,14 +3,12 @@ from threading import Thread
 from collections import namedtuple
 from uuid import uuid4 as uuid
 
-from task import Task
-
 noop = lambda _: None
 runtime = { 'inputs': [], 'updating': False }
 
-Mailbox = namedtuple('Mailbox', ['signal','address'])
-
 # public
+
+Mailbox = namedtuple('Mailbox', ['signal','address'])
 
 def mailbox(value):
   def _rej(e):
@@ -114,4 +112,8 @@ class Signal():
     for p in parents:
       p.kids.append(self)
 
+
+class Task():
+  def __init__(self,fork):
+    self.fork = fork
 
