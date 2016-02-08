@@ -91,13 +91,22 @@ def logresult(fn,addr,lvl,task):
   def _log(lvl):
     def _tap(x):
       try:
-        log.log(lvl,fn(x),addr)
+        msgs = fn(x)
+        for msg in msgs:
+          log.log(lvl,msg,addr)
         return x
       except Exception:
         return x
     return _tap
 
-  return task.bimap( _log(ERROR), _log(lvl) )
+  def _logerr(e):
+    try:
+      log.error(e,addr)
+      return e
+    except Exception:
+      return e
+ 
+  return task.bimap( _logerr, _log(lvl) )
 
 def logresult_debug(fn,addr,task):
   return logresult(fn,addr,DEBUG,task)
