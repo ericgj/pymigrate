@@ -306,7 +306,8 @@ def split_schema_files_at_version(version,files):
         pend.append(name)
     return (prev,pend)
 
-  return reduce(_acc, files, ([],[]) )
+  (prev,pend) = reduce(_acc, files, ([],[]) )
+  return (sorted(prev), sorted(pend))
 
 @curry
 def matching_schema_files_after_version(version,files):
